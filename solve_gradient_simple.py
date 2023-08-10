@@ -55,9 +55,7 @@ G = torch.concatenate((
 # spl = splrep(x=[0, n//10, n], y=[10, 1, 2], k=2)
 # spl(range(n))
 
-G = torch.tensor(scipy.ndimage.gaussian_filter1d(G, sigma=30))
-
-constrain_decreasing = False
+#G = torch.tensor(scipy.ndimage.gaussian_filter1d(G, sigma=30))
 
 D = 1.0
 
@@ -70,46 +68,7 @@ mask = np.zeros(n)
 mask[0] = 1
 mask = torch.tensor(mask)
 
-def lamb_from_increments_torch(x):
-    xmod = x.sub(x*mask) # Set first entry to 0
-    v = torch.exp(-xmod)
-    cexp = torch.cumprod(v, dim=0)
-    cexp_shift = cexp * x[0]
-    #pdb.set_trace()
-    return cexp_shift
-
-def lamb_from_increments(xraw):
-    if not torch.is_tensor(xraw):
-        x = torch.tensor(xraw, dtype=torch.float64)
-    else:
-        x = xraw
-    result = lamb_from_increments_torch(x)
-
-    if torch.is_tensor(xraw):
-        return result
-    else:
-        return result.numpy()
-
-
-def lamb_to_increments(yraw):
-    if not torch.is_tensor(yraw):
-        y = torch.tensor(yraw, dtype=torch.float64)
-    else:
-        y = yraw
-    def inv_cum_prod(v):
-        return torch.exp(torch.diff(torch.log(v)))
-    log_incs = -torch.log(inv_cum_prod(y))
-    result = torch.concatenate(
-        (torch.tensor([y[0]]), log_incs))
-    if torch.is_tensor(yraw):
-        return result
-    else:
-        return result.numpy()
-
-y0 = np.flip(np.cumsum(np.abs(numpy.random.normal(size=n))))/n
-x0 = lamb_to_increments(y0)
-
-assert np.all(np.isclose(lamb_from_increments(x0), y0))
+x0 = np.array([D/(math.sqrt(n)) for _ in range(n)])
 
 def func(x_raw):
     if torch.is_tensor(x_raw):
@@ -119,7 +78,7 @@ def func(x_raw):
                          dtype=torch.float64, 
                          requires_grad=True)
     # Convert to cumulative value
-    lamb = lamb_from_increments_torch(x)
+    lamb = x
     lamb_sq = lamb*lamb
 
     lamb_flip = lamb.flip(dims=(0,))
@@ -150,10 +109,7 @@ def func(x_raw):
 fx0, fgx0 = func(x0)
 
 start = time.time()
-if constrain_decreasing:
-    bounds = [(1e-12, np.inf)] + [(0, 10) for _ in range(n-1)]
-else:
-    bounds = [(1e-12, np.inf)] + [(-10, 10) for _ in range(n-1)]
+bounds = [(1e-12, np.inf) for _ in range(n)]
 print(f"Starting solve...")
 xopt_inc, fopt, dopt = scipy.optimize.fmin_l_bfgs_b(
     func, x0,
@@ -167,7 +123,7 @@ xopt_inc, fopt, dopt = scipy.optimize.fmin_l_bfgs_b(
 )
 
 end = time.time()
-xopt = lamb_from_increments(xopt_inc)
+xopt = xopt_inc
 assert dopt['warnflag'] == 0
 
 print(f"Time taken: {end - start}")
