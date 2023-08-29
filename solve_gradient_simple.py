@@ -64,10 +64,6 @@ Gsq = G**2
 
 numpy.random.seed(42)
 
-mask = np.zeros(n)
-mask[0] = 1
-mask = torch.tensor(mask)
-
 x0 = np.array([D/(math.sqrt(n)) for _ in range(n)])
 
 def func(x_raw):
