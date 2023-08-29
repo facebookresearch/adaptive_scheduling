@@ -243,11 +243,11 @@ for i, fname in enumerate(fnames):
         warmup_steps = warmup_perc[basename] * nsched
         
         poly_sched = np.zeros(nsched)
-        for i in range(nsched):
-            if i < warmup_steps:
-                poly_sched[i] = (i+1)/warmup_steps
+        for j in range(nsched):
+            if j < warmup_steps:
+                poly_sched[j] = (j+1)/warmup_steps
             else:   
-                poly_sched[i] = (1-(i-warmup_steps)/(nsched - warmup_steps))**poly_exp[basename]
+                poly_sched[j] = (1-(j-warmup_steps)/(nsched - warmup_steps))**poly_exp[basename]
         
         ax.plot(xsched, poly_sched, 'blue', alpha=0.35)
 
