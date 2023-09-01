@@ -1,8 +1,8 @@
 import numpy as np
 import csv
 from scipy.interpolate import UnivariateSpline, splrep, BSpline, splev
-from scipy.ndimage import gaussian_filter1d
-from find_schedule import find_schedule
+from scipy.ndimage import gaussian_filter1d, median_filter
+from find_schedule import find_closed_form_schedule
 import os
 import torch
 import glob
@@ -25,10 +25,11 @@ mpl.rcParams['ytick.major.width'] = linewidth
 
 compute_schedules = True
 show_log_schedules = False
-gnorm_division = True
+gnorm_mul = True
 
 # How many points to subsample down to for the plots
-nvals = 1000
+nvals = 10000
+skip = 10
 
 # Smoothing amounts hand tuned for plotting
 sigma1 = 0.0002
@@ -63,18 +64,21 @@ for i, fname in enumerate(fnames):
     #import pdb; pdb.set_trace()
     glen = len(gnorms)
 
-    if glen < nvals:
-        gnorms = np.interp(
-            np.linspace(0, 1.0, nvals),
-            np.linspace(0, 1.0, glen), 
-            gnorms)
-        glen = len(gnorms)
+    gnorms = np.interp(
+        np.linspace(0, 1.0, nvals),
+        np.linspace(0, 1.0, glen), 
+        gnorms)
+    glen = len(gnorms)
 
 
     print("filtering")
     gnorms_filtered1 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma1*glen, mode="nearest"))
-    gnorms_filtered2 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma2*glen, mode="nearest"))
+    #gnorms_filtered2 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma2*glen, mode="nearest"))
+    pad = 1000
+    filter_width = 2*(int(0.3*glen)//2) + 1
+    gnorms_filtered2 = median_filter(np.pad(gnorms, (0, pad), mode='reflect'), size=filter_width, mode='nearest')[:-pad]
 
+    print("interpolating")
     gnorms_short = np.interp(
         np.linspace(0, 1.0, nvals),
         np.linspace(0, 1.0, glen), 
@@ -96,7 +100,7 @@ for i, fname in enumerate(fnames):
 
     ax = axs[i, 0]
     ax.xaxis.set_major_formatter(xticks)
-    ax.plot(x, gnorms_short, 'k')
+    ax.plot(x[::skip], gnorms_short[::skip], 'k')
     ax.text(0.5, 0.7, name, ha="center", verticalalignment='center', 
             color='k', transform = ax.transAxes)
     if i == 0:
@@ -106,23 +110,22 @@ for i, fname in enumerate(fnames):
 
     ax = axs[i, 1]
     ax.xaxis.set_major_formatter(xticks)
-    ax.plot(x, gnorms_smoothed, 'k')
+    ax.plot(x[::skip], gnorms_smoothed[::skip], 'k')
     if i == 0:
         ax.set_title(f"Smoothed Gradient Norms")
 
     if compute_schedules:
         print("Optimizing schedule")
-        sched = find_schedule(torch.tensor(gnorms_smoothed))
+        sched = find_closed_form_schedule(gnorms_smoothed)
 
-        sched = sched[:-3]
         xsched = np.linspace(0, 100.0, len(sched))
 
-        if gnorm_division:
-            gnorms_div = np.interp(
+        if gnorm_mul:
+            gnorms_mod = np.interp(
                 np.linspace(0, 1.0, len(sched)),
                 np.linspace(0, 1.0, glen), 
                 gnorms_filtered2)
-            sched = sched/gnorms_div
+            sched = sched*gnorms_mod
             sched = sched/np.max(sched[:len(sched)//2])
 
         # Save schedule
@@ -135,14 +138,14 @@ for i, fname in enumerate(fnames):
 
         ax = axs[i, 2]
         ax.xaxis.set_major_formatter(xticks)
-        ax.plot(xsched, sched, 'k')
+        ax.plot(xsched[::skip], sched[::skip], 'k')
         if i == 0:
             ax.set_title(f"Refined Schedule")
 
         if show_log_schedules:
             ax = axs[i, 3]
             ax.xaxis.set_major_formatter(xticks)
-            ax.plot(xsched, sched, 'k')
+            ax.plot(xsched[::skip], sched[::skip], 'k')
             ax.set_yscale('log')
             if i == 0:
                 ax.set_title(f"Refined Schedule (Log Axis)")
@@ -151,9 +154,6 @@ for i, fname in enumerate(fnames):
     plt.tight_layout()
 
 fname = f"convex_grids_{nvals}"
-
-if gnorm_division:
-    fname += "_div"
 
 #plt.savefig(fname + ".png", bbox_inches='tight', pad_inches=0, dpi=300)
 plt.savefig(fname + ".pdf", bbox_inches='tight', pad_inches=0, dpi=300)

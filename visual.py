@@ -1,8 +1,8 @@
 import numpy as np
 import csv
 from scipy.interpolate import UnivariateSpline, splrep, BSpline, splev
-from scipy.ndimage import gaussian_filter1d
-from find_schedule import find_schedule
+from scipy.ndimage import gaussian_filter1d, median_filter
+from find_schedule import find_schedule, find_closed_form_schedule
 import os
 import torch
 import glob
@@ -25,10 +25,12 @@ mpl.rcParams['xtick.major.width'] = linewidth
 mpl.rcParams['ytick.major.width'] = linewidth
 
 compute_schedules = True
+write_to_disk = True
 
 # How many points to subsample down to for the plots
 #nvals = 1000
-nvals = 2000
+nvals = 10_000
+skip = 10 # Only plot every 10th point
 
 # Smoothing amounts hand tuned for plotting
 sigma1 = 0.0002
@@ -143,7 +145,9 @@ for i, fname in enumerate(fnames):
 
     print("filtering")
     gnorms_filtered1 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma1*glen, mode="nearest"))
-    gnorms_filtered2 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma2*glen, mode="nearest"))
+    gnorms_filtered2 = median_filter(gnorms, size=1201, mode='nearest')
+
+    #gnorms_filtered2 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma2*glen, mode="nearest"))
 
     gnorms_short = np.interp(
         np.linspace(0, 1.0, nvals),
@@ -170,7 +174,7 @@ for i, fname in enumerate(fnames):
 
     ax = axs[i, 0]
     ax.xaxis.set_major_formatter(xticks)
-    ax.plot(x, gnorms_short, 'k')
+    ax.plot(x[::skip], gnorms_short[::skip], 'k')
 
     # Fix overlapping issue
     if basename == "imagenet.csv":
@@ -189,7 +193,7 @@ for i, fname in enumerate(fnames):
                     loc=gnorm_log_inset_map[basename])
     logaxis.tick_params(axis='both', which='major', labelsize=2, pad=0)
     logaxis.tick_params(axis='both', which='minor', labelsize=2, pad=0)
-    logaxis.plot(x, gnorms_short, 'k')
+    logaxis.plot(x[::skip], gnorms_short[::skip], 'k')
     logaxis.set_yscale('log')
     logaxis.patch.set_alpha(0.6)
     logaxis.get_xaxis().set_visible(False)
@@ -198,23 +202,24 @@ for i, fname in enumerate(fnames):
 
     ax = axs[i, 1]
     ax.xaxis.set_major_formatter(xticks)
-    ax.plot(x, gnorms_smoothed, 'k')
+    ax.plot(x[::skip], gnorms_smoothed[::skip], 'k')
     if i == 0:
         ax.set_title(f"Smoothed Gradient Norms")
 
     if compute_schedules:
         print("Optimizing schedule")
-        sched = find_schedule(torch.tensor(gnorms_smoothed))
+        sched = find_closed_form_schedule(gnorms_smoothed)
 
         sched = sched[:-3]
         xsched = np.linspace(0, 100.0, len(sched))
         sched_nognorm = sched/np.max(sched[:len(sched)//2])
 
-        out_name = fname.replace(".csv", ".sched_nognorm")
-        with open(out_name, 'w') as f:
-            for idx in range(len(sched)):
-                f.write(f"{sched_nognorm[idx]}\n")
-        print(f"Wrote {out_name}")
+        if write_to_disk:
+            out_name = fname.replace(".csv", ".sched_nognorm_median")
+            with open(out_name, 'w') as f:
+                for idx in range(len(sched)):
+                    f.write(f"{sched_nognorm[idx]}\n")
+            print(f"Wrote {out_name}")
 
         gnorms_mul = np.interp(
             np.linspace(0, 1.0, len(sched)),
@@ -224,11 +229,12 @@ for i, fname in enumerate(fnames):
         sched_gnorm = sched_gnorm/np.max(sched_gnorm[:len(sched_gnorm)//2])
 
         # Save schedule
-        out_name = fname.replace(".csv", ".sched")
-        with open(out_name, 'w') as f:
-            for idx in range(len(sched_gnorm)):
-                f.write(f"{sched_gnorm[idx]}\n")
-        print(f"Wrote {out_name}")
+        if write_to_disk:
+            out_name = fname.replace(".csv", ".sched_median")
+            with open(out_name, 'w') as f:
+                for idx in range(len(sched_gnorm)):
+                    f.write(f"{sched_gnorm[idx]}\n")
+            print(f"Wrote {out_name}")
 
         if uses_adam[basename]:
             sched = sched_gnorm
@@ -237,7 +243,14 @@ for i, fname in enumerate(fnames):
 
         ax = axs[i, 2]
         ax.xaxis.set_major_formatter(xticks)
-        ax.plot(xsched, sched, 'k',  linewidth=0.4)
+        ax.plot(xsched[::skip], sched[::skip], 'k',  linewidth=0.4)
+
+        # sched_all = find_closed_form_schedule(gnorms)
+        # sched_all = sched_all[:-3]*gnorms[:-3]
+        # sched_all = sched_all/np.max(sched_all[:len(sched_all)//2])
+
+        # xsched_all = np.linspace(0, 100.0, len(sched_all))
+        # ax.plot(xsched_all, sched_all, 'green',  linewidth=0.2)
 
         nsched = len(sched)
         warmup_steps = warmup_perc[basename] * nsched
@@ -249,7 +262,21 @@ for i, fname in enumerate(fnames):
             else:   
                 poly_sched[j] = (1-(j-warmup_steps)/(nsched - warmup_steps))**poly_exp[basename]
         
-        ax.plot(xsched, poly_sched, 'blue', alpha=0.35)
+        ax.plot(xsched[::skip], poly_sched[::skip], 'blue', alpha=0.35)
+
+        # acum = 0.0
+        # alt_sched2 = find_closed_form_schedule(gnorms_smoothed)
+        # alt_sched2 = max(sched) * alt_sched2/max(alt_sched2)
+        # alt_sched2 = alt_sched2[:-3]
+
+        # if uses_adam[basename]:
+        #     alt_sched2 = alt_sched2*gnorms_mul
+        #     alt_sched2 = alt_sched2/np.max(alt_sched2[:len(alt_sched2)//2])
+
+        # ax.plot(xsched, alt_sched2, 'green', linewidth=0.6, alpha=0.5, label="Closed Form")
+
+        #ax.legend()
+        plt.tight_layout()
 
         if i == 0:
             ax.set_title(f"Refined Schedule")
@@ -261,7 +288,7 @@ for i, fname in enumerate(fnames):
         logaxis.xaxis.set_major_formatter(xticks)
         logaxis.tick_params(axis='both', which='major', labelsize=2, pad=0)
         logaxis.tick_params(axis='both', which='minor', labelsize=2, pad=0)
-        logaxis.plot(xsched, sched, 'k')
+        logaxis.plot(xsched[::skip], sched[::skip], 'k')
         logaxis.set_yscale('log')
         logaxis.patch.set_alpha(0.6)
         logaxis.get_xaxis().set_visible(False)
