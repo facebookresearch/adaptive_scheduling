@@ -75,7 +75,7 @@ for i, fname in enumerate(fnames):
     gnorms_filtered1 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma1*glen, mode="nearest"))
     #gnorms_filtered2 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma2*glen, mode="nearest"))
     pad = 1000
-    filter_width = 2*(int(0.3*glen)//2) + 1
+    filter_width = 2*(int(0.5*glen)//2) + 1
     gnorms_filtered2 = median_filter(np.pad(gnorms, (0, pad), mode='reflect'), size=filter_width, mode='nearest')[:-pad]
 
     print("interpolating")
@@ -120,6 +120,12 @@ for i, fname in enumerate(fnames):
 
         xsched = np.linspace(0, 100.0, len(sched))
 
+        # Save schedule
+        out_name = fname.replace(".csv", ".sched_nognorm_median")
+        with open(out_name, 'w') as f:
+            for idx in range(len(sched)):
+                f.write(f"{sched[idx]}\n")
+
         if gnorm_mul:
             gnorms_mod = np.interp(
                 np.linspace(0, 1.0, len(sched)),
@@ -129,7 +135,7 @@ for i, fname in enumerate(fnames):
             sched = sched/np.max(sched[:len(sched)//2])
 
         # Save schedule
-        out_name = fname.replace(".csv", ".sched")
+        out_name = fname.replace(".csv", ".sched_median")
         with open(out_name, 'w') as f:
             for idx in range(len(sched)):
                 f.write(f"{sched[idx]}\n")

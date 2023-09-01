@@ -145,7 +145,9 @@ for i, fname in enumerate(fnames):
 
     print("filtering")
     gnorms_filtered1 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma1*glen, mode="nearest"))
-    gnorms_filtered2 = median_filter(gnorms, size=1201, mode='nearest')
+    #gnorms_filtered2 = median_filter(gnorms, size=1201, mode='nearest')
+    pad = 1000
+    gnorms_filtered2 = median_filter(np.pad(gnorms, (0, pad), mode='reflect'), size=1201, mode='nearest')[:-pad]
 
     #gnorms_filtered2 = torch.tensor(gaussian_filter1d(gnorms, sigma=sigma2*glen, mode="nearest"))
 
