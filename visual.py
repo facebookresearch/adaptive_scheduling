@@ -87,14 +87,14 @@ uses_adam = {
 }
 
 warmup_perc = {
-    'dlrm.csv': 0.08,
-    'gpt.csv': 0.24,
-    'iwslt14.csv': 0.1,
+    'dlrm.csv': 0.02,
+    'gpt.csv': 0.22,
+    'iwslt14.csv': 0.08,
     'roberta.csv': 0.2,
-    "vit.csv": 0.12,
-    "mri.csv": 0.12,
-    'rcnn.csv': 0.07,
-    "imagenet.csv": 0.065,
+    "vit.csv": 0.07,
+    "mri.csv": 0.06,
+    'rcnn.csv': 0.06,
+    "imagenet.csv": 0.01,
 }
 
 poly_exp = {
@@ -102,10 +102,10 @@ poly_exp = {
     'gpt.csv': 1.2,
     'iwslt14.csv': 1.3,
     'roberta.csv': 1.0,
-    "vit.csv": 1.5,
+    "vit.csv": 1.3,
     "mri.csv": 0.5,
-    'rcnn.csv': 2.0,
-    "imagenet.csv": 2.4,
+    'rcnn.csv': 2.2,
+    "imagenet.csv": 2.6,
 }
 
 nrows = len(name_map)
@@ -212,7 +212,7 @@ for i, fname in enumerate(fnames):
         print("Optimizing schedule")
         sched = find_closed_form_schedule(gnorms_smoothed)
 
-        sched = sched[:-3]
+        #sched = sched[:-3]
         xsched = np.linspace(0, 100.0, len(sched))
         sched_nognorm = sched/np.max(sched[:len(sched)//2])
 
