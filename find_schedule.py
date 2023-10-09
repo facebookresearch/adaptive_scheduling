@@ -88,11 +88,12 @@ def find_schedule(G, D=1):
     return xopt
 
 
-def find_closed_form_schedule(G, D=1):
+def find_closed_form_schedule(G, D=1, weights=None):
     T = len(G)
     sched = np.zeros(T)
     G = np.array(G)
-    weights = G**-2.0
+    if weights is None:
+        weights = G**-2.0
     tail_sums = np.flip(np.cumsum(np.flip(weights)))
     for t in range(T):
         if t == T-1:
