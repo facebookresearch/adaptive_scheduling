@@ -13,7 +13,7 @@ primaryClass={cs.LG}
 }
 ```
 
-# Refinment method
+# Refinement method
 The `find_closed_form_schedule` function in the `find_schedule.py` implements the gradient norm to weight mapping.
 
 The filtering with a median filter can be done using scipy's `scipy.ndimage.median_filter` implementation. Some care is needed to handle the padding:
