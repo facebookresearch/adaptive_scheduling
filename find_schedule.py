@@ -10,7 +10,30 @@ import time
 import scipy
 import math
 
+
+def find_closed_form_schedule(G, D=1, weights=None):
+    """
+    Produces the refined learning rate schedule given a gradient norm sequence.
+    Defaults to the SGD version using inverse-square weights if weights=None.
+    If using Adam and L1 norms, pass in the weights manually.
+    """
+    T = len(G)
+    sched = np.zeros(T)
+    G = np.array(G)
+    if weights is None:
+        weights = G**-2.0
+    tail_sums = np.flip(np.cumsum(np.flip(weights)))
+    for t in range(T):
+        if t == T-1:
+            sched[t] = 0
+        else:
+            sched[t] = weights[t]*tail_sums[t+1]/tail_sums[-1]
+    return sched
+
 def find_schedule(G, D=1):
+    """
+    Uses the second approach, optimizing numerically a weighted gradient norm bound.
+    """
     n = len(G)
 
     Dsq = D**2
@@ -82,18 +105,3 @@ def find_schedule(G, D=1):
         print("WARNING: Nonconvergece")
 
     return xopt
-
-
-def find_closed_form_schedule(G, D=1, weights=None):
-    T = len(G)
-    sched = np.zeros(T)
-    G = np.array(G)
-    if weights is None:
-        weights = G**-2.0
-    tail_sums = np.flip(np.cumsum(np.flip(weights)))
-    for t in range(T):
-        if t == T-1:
-            sched[t] = 0
-        else:
-            sched[t] = weights[t]*tail_sums[t+1]/tail_sums[-1]
-    return sched
