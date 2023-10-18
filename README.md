@@ -1,5 +1,5 @@
 #  Adaptive Learning Rate Scheduling by Refinement
-Scripts for replicating the visualization plots in the paper "When, Why and How Much? Adaptive Learning Rate Scheduling by Refinement".
+Scripts for replicating the visualization plots in the paper ["When, Why and How Much? Adaptive Learning Rate Scheduling by Refinement".](https://arxiv.org/abs/2310.07831)
 
 Please cite as:
 ```
